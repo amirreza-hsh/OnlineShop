@@ -27,7 +27,11 @@ builder.Services.AddSwaggerGen();
 // ۳. اضافه کردن ارتباط دیتابیس به سیستم
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// ثبت کلاس ارتباط سبد خرید با دیتابیس
+builder.Services.AddScoped<ICartRepository, CartRepository>();
 
+// ثبت کلاس اجرای عملیات سبد خرید
+builder.Services.AddScoped<ICartService, CartService>();
 var app = builder.Build();
 
 // ۴. فعال‌سازی محیط Swagger در حالت توسعه (Development)

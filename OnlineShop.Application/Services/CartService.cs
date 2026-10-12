@@ -21,13 +21,13 @@ public class CartService : ICartService
     {
         var cart = await _cartRepository.GetByUserIdAsync(userId);
 
-        // اگر کاربر هنوز سبد خریدی نداشت، یک سبد خالی با شناسه خودش برمی‌گردانیم
+        // اگر سبد وجود ندارد، اطلاعات یک سبد خالی را برمی‌گردانیم
         if (cart == null)
         {
             return new CartDto { UserId = userId };
         }
 
-        // مپ کردن موجودیت‌های دیتابیس به DTO خروجی
+        // تبدیل اطلاعات سبد به مدل خروجی API
         return new CartDto
         {
             Id = cart.Id,
@@ -36,6 +36,10 @@ public class CartService : ICartService
             {
                 Id = item.Id,
                 ProductId = item.ProductId,
+
+                // عنوان محصول مربوط به این آیتم
+                ProductName = item.Product.Title,
+
                 UnitPrice = item.UnitPrice,
                 Quantity = item.Quantity
             }).ToList()
@@ -45,47 +49,74 @@ public class CartService : ICartService
     // افزودن کالا به سبد خرید
     public async Task AddToCartAsync(string userId, AddToCartDto dto)
     {
-        // ۱. بررسی یا ایجاد سبد خرید برای کاربر
+        // بررسی ورودی در سرویس، حتی اگر از خارج API فراخوانی شود
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("شناسه کاربر الزامی است.");
+
+        if (dto.ProductId <= 0)
+            throw new ArgumentException("شناسه محصول معتبر نیست.");
+
+        if (dto.Quantity < 1 || dto.Quantity > 100)
+            throw new ArgumentException("تعداد باید بین ۱ تا ۱۰۰ باشد.");
+
+        // ابتدا محصول را بررسی می‌کنیم تا سبد بی‌دلیل ساخته نشود
+        var product = await _cartRepository.GetProductByIdAsync(dto.ProductId);
+
+        if (product == null)
+            throw new KeyNotFoundException("محصول مورد نظر یافت نشد.");
+
+        if (!product.IsActive)
+            throw new ArgumentException("این محصول در حال حاضر قابل خرید نیست.");
+
         var cart = await _cartRepository.GetByUserIdAsync(userId);
+
+        // بررسی اینکه محصول از قبل در سبد وجود دارد یا نه
+        var cartItem = cart?.Items
+            .FirstOrDefault(item => item.ProductId == dto.ProductId);
+
+        // تعداد نهایی شامل تعداد قبلی و تعداد درخواست جدید است
+        long totalQuantity = (long)(cartItem?.Quantity ?? 0) + dto.Quantity;
+
+        if (totalQuantity > product.Stock)
+            throw new ArgumentException(
+                $"موجودی کافی نیست. موجودی فعلی: {product.Stock} عدد.");
+
+        // در نبود سبد، آن را همراه آیتم جدید آماده می‌کنیم
         if (cart == null)
         {
             cart = new Cart { UserId = userId };
+
+            cart.Items.Add(new CartItem
+            {
+                ProductId = product.Id,
+                Quantity = dto.Quantity,
+                UnitPrice = product.DiscountPrice ?? product.Price
+            });
+
             await _cartRepository.AddAsync(cart);
-            await _cartRepository.SaveChangesAsync();
         }
-
-        // ۲. اعتبارسنجی وجود کالا و دریافت قیمت لحظه‌ای آن
-        var product = await _cartRepository.GetProductByIdAsync(dto.ProductId);
-        if (product == null)
+        else if (cartItem == null)
         {
-            throw new Exception("محصول مورد نظر یافت نشد.");
-        }
-
-        // ۳. بررسی تکراری بودن آیتم در سبد
-        var cartItem = cart.Items.FirstOrDefault(ci => ci.ProductId == dto.ProductId);
-
-        if (cartItem == null)
-        {
-            // آیتم جدید است و باید اضافه شود
-            var newItem = new CartItem
+            // محصول جدید را به سبد موجود اضافه می‌کنیم
+            await _cartRepository.AddItemAsync(new CartItem
             {
                 CartId = cart.Id,
-                ProductId = dto.ProductId,
+                ProductId = product.Id,
                 Quantity = dto.Quantity,
-                UnitPrice = product.Price
-            };
-            await _cartRepository.AddItemAsync(newItem);
+                UnitPrice = product.DiscountPrice ?? product.Price
+            });
         }
         else
         {
-            // آیتم از قبل موجود است؛ صرفاً تعداد آن را افزایش می‌دهیم
-            cartItem.Quantity += dto.Quantity;
+            // برای محصول تکراری، تعداد همان ردیف را افزایش می‌دهیم
+            cartItem.Quantity = (int)totalQuantity;
         }
 
-        // ۴. ذخیره نهایی تغییرات
+        cart.UpdatedAt = DateTime.UtcNow;
+
+        // تغییرات سبد و آیتم را با یک بار ذخیره ثبت می‌کنیم
         await _cartRepository.SaveChangesAsync();
     }
-
     // حذف کالا از سبد خرید
     public async Task RemoveFromCartAsync(string userId, int productId)
     {

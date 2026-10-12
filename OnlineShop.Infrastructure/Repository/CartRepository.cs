@@ -18,8 +18,13 @@ public class CartRepository : ICartRepository
     public async Task<Cart?> GetByUserIdAsync(string userId)
     {
         return await _context.Carts
-            .Include(c => c.Items)
-            .FirstOrDefaultAsync(c => c.UserId == userId);
+            // دریافت آیتم‌های داخل سبد
+            .Include(cart => cart.Items)
+
+            // دریافت محصول مربوط به هر آیتم
+            .ThenInclude(item => item.Product)
+
+            .FirstOrDefaultAsync(cart => cart.UserId == userId);
     }
 
     public async Task AddAsync(Cart cart)

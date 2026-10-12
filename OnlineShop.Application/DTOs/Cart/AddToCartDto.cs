@@ -1,14 +1,17 @@
-﻿// File: OnlineShop.Application/DTOs/Cart/AddToCartDto.cs
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
-// دیتایی که کاربر از سمت فرانت‌اِند برای اضافه کردن یک جنس می‌فرستد ➕
+namespace OnlineShop.Application.DTOs.Cart;
+
+// اطلاعاتی که برای افزودن محصول از کاربر دریافت می‌کنیم
 public class AddToCartDto
 {
-    // شناسه محصولی که کاربر روی دکمه "خرید" آن زده است
-    [Required]
+    // شناسه محصول باید عددی مثبت باشد
+    [Range(1, int.MaxValue,
+        ErrorMessage = "شناسه محصول باید بیشتر از صفر باشد.")]
     public int ProductId { get; set; }
 
-    // تعدادی که کاربر انتخاب کرده (حداقل باید ۱ عدد باشد)
-    [Range(1, 100, ErrorMessage = "تعداد باید حداقل ۱ و حداکثر ۱۰۰ عدد باشد.")]
+    // تعداد مجاز در هر درخواست
+    [Range(1, 100,
+        ErrorMessage = "تعداد باید بین ۱ تا ۱۰۰ باشد.")]
     public int Quantity { get; set; } = 1;
 }
