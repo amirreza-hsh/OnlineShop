@@ -19,15 +19,16 @@ public class CartService : ICartService
     // دریافت سبد خرید کاربر به همراه تبدیل به DTO
     public async Task<CartDto> GetCartByUserIdAsync(string userId)
     {
+        // دریافت سبد به همراه آیتم‌ها و محصولات
         var cart = await _cartRepository.GetByUserIdAsync(userId);
 
-        // اگر سبد وجود ندارد، اطلاعات یک سبد خالی را برمی‌گردانیم
+        // برای کاربری که سبد ندارد، پاسخ خالی می‌سازیم
         if (cart == null)
         {
             return new CartDto { UserId = userId };
         }
 
-        // تبدیل اطلاعات سبد به مدل خروجی API
+        // تبدیل اطلاعات سبد به پاسخ API
         return new CartDto
         {
             Id = cart.Id,
@@ -37,7 +38,7 @@ public class CartService : ICartService
                 Id = item.Id,
                 ProductId = item.ProductId,
 
-                // عنوان محصول مربوط به این آیتم
+                // قرار دادن عنوان محصول در خروجی
                 ProductName = item.Product.Title,
 
                 UnitPrice = item.UnitPrice,
