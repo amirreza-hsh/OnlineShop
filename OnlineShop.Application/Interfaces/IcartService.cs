@@ -14,4 +14,9 @@ public interface ICartService
 
     // حذف یک محصول از سبد خرید
     Task RemoveFromCartAsync(string userId, int productId);
+    // تغییر تعداد یک محصول موجود در سبد خرید
+    Task UpdateItemQuantityAsync(
+        string userId,
+        int productId,
+        UpdateCartItemQuantityDto dto);
 }

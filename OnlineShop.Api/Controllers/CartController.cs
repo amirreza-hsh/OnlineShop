@@ -62,4 +62,67 @@ public class CartController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+    // PUT: api/cart/test/items/4
+    // تغییر تعداد محصول مشخص در سبد کاربر آزمایشی
+    [HttpPut("test/items/{productId:int}")]
+    public async Task<IActionResult> UpdateTestItemQuantity(
+        int productId,
+        [FromBody] UpdateCartItemQuantityDto dto,
+        [FromServices] IWebHostEnvironment environment)
+    {
+        // این مسیر فقط مخصوص محیط توسعه است
+        if (!environment.IsDevelopment())
+            return NotFound();
+
+        try
+        {
+            // اجرای منطق تغییر تعداد در لایه Application
+            await _cartService.UpdateItemQuantityAsync(
+                "test-user",
+                productId,
+                dto);
+
+            // عملیات موفق؛ پاسخی در بدنه برنمی‌گردانیم
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            // سبد یا محصول موردنظر وجود ندارد
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            // تعداد یا شرایط خرید نامعتبر است
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+    // DELETE: api/cart/test/items/4
+    // حذف محصول از سبد خرید کاربر آزمایشی
+    [HttpDelete("test/items/{productId:int}")]
+    public async Task<IActionResult> RemoveTestItem(
+        int productId,
+        [FromServices] IWebHostEnvironment environment)
+    {
+        // این Endpoint فقط در محیط Development فعال است
+        if (!environment.IsDevelopment())
+            return NotFound();
+
+        try
+        {
+            // حذف محصول از سبد خرید
+            await _cartService.RemoveFromCartAsync(
+                "test-user",
+                productId);
+
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }
