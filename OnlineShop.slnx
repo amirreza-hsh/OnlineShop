@@ -3,4 +3,5 @@
   <Project Path="OnlineShop.Application/OnlineShop.Application.csproj" />
   <Project Path="OnlineShop.Domain/OnlineShop.Domain.csproj" />
   <Project Path="OnlineShop.Infrastructure/OnlineShop.Infrastructure.csproj" />
+  <Project Path="OnlineShop.Tests/OnlineShop.Tests.csproj" Id="a965582f-1884-4356-8ec4-75791f911353" />
 </Solution>
