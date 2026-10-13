@@ -3,6 +3,7 @@ using OnlineShop.Application.Interfaces;
 using OnlineShop.Application.Services;
 using OnlineShop.Infrastructure.Data;
 using OnlineShop.Infrastructure.Repositories;
+using OnlineShop.Api.ExceptionHandling;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,7 +33,14 @@ builder.Services.AddScoped<ICartRepository, CartRepository>();
 
 // ثبت کلاس اجرای عملیات سبد خرید
 builder.Services.AddScoped<ICartService, CartService>();
+// ثبت سیستم مدیریت متمرکز خطاها
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+// فعال‌سازی پشتیبانی از پاسخ‌های استاندارد ProblemDetails
+builder.Services.AddProblemDetails();
 var app = builder.Build();
+// فعال‌سازی Middleware مدیریت خطاها
+app.UseExceptionHandler();
 
 // ۴. فعال‌سازی محیط Swagger در حالت توسعه (Development)
 if (app.Environment.IsDevelopment())

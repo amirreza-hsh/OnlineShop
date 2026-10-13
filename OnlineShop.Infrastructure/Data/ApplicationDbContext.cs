@@ -25,6 +25,18 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        // محدود کردن طول شناسه کاربر برای امکان ساخت Index
+        modelBuilder.Entity<Cart>()
+            .Property(c => c.UserId)
+            .IsRequired()
+            .HasMaxLength(450);
+
+        // هر کاربر حداکثر یک سبد فعال داشته باشد
+        modelBuilder.Entity<Cart>()
+            .HasIndex(c => c.UserId)
+            .IsUnique()
+            .HasDatabaseName("IX_Carts_UserId_Active")
+            .HasFilter("[IsActive] = 1");
 
         // ۱. تنظیم دقت قیمت برای جلوگیری از خطای ارقام اعشاری در SQL Server
         modelBuilder.Entity<Product>()

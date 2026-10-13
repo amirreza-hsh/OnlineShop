@@ -41,9 +41,15 @@ namespace OnlineShop.Infrastructure.Migrations
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Carts_UserId_Active")
+                        .HasFilter("[IsActive] = 1");
 
                     b.ToTable("Carts");
                 });
