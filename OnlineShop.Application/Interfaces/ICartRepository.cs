@@ -16,4 +16,6 @@ public interface ICartRepository
     Task<Product?> GetProductByIdAsync(int productId);
 
     Task SaveChangesAsync();
+    // حذف مجموعه‌ای از آیتم‌های سبد خرید
+    void RemoveItems(IEnumerable<CartItem> cartItems);
 }

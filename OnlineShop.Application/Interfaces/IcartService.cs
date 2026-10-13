@@ -19,4 +19,6 @@ public interface ICartService
         string userId,
         int productId,
         UpdateCartItemQuantityDto dto);
+    // حذف تمام محصولات موجود در سبد خرید کاربر
+    Task ClearCartAsync(string userId);
 }

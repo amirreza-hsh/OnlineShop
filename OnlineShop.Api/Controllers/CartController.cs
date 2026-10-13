@@ -125,4 +125,33 @@ public class CartController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+    // DELETE: api/cart/test/items
+    // حذف تمام محصولات سبد خرید کاربر آزمایشی
+    [HttpDelete("test/items")]
+    public async Task<IActionResult> ClearTestCart(
+        [FromServices] IWebHostEnvironment environment)
+    {
+        // این Endpoint فقط در محیط توسعه فعال است
+        if (!environment.IsDevelopment())
+            return NotFound();
+
+        try
+        {
+            // درخواست خالی کردن سبد کاربر آزمایشی
+            await _cartService.ClearCartAsync("test-user");
+
+            // عملیات با موفقیت انجام شد
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            // سبد فعال وجود ندارد
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            // شناسه کاربر نامعتبر است
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

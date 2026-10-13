@@ -121,31 +121,36 @@ public class CartService : ICartService
     // حذف کامل یک محصول از سبد خرید کاربر
     public async Task RemoveFromCartAsync(string userId, int productId)
     {
-        // بررسی معتبر بودن شناسه کاربر
+        // بررسی شناسه کاربر
         if (string.IsNullOrWhiteSpace(userId))
             throw new ArgumentException("شناسه کاربر معتبر نیست.");
 
-        // بررسی معتبر بودن شناسه محصول
+        // بررسی شناسه محصول
         if (productId <= 0)
             throw new ArgumentException("شناسه محصول معتبر نیست.");
 
-        // دریافت سبد خرید کاربر به همراه آیتم‌های آن
+        // دریافت سبد خرید کاربر
         var cart = await _cartRepository.GetByUserIdAsync(userId);
 
-        // بررسی وجود سبد خرید فعال
+        // بررسی وجود سبد فعال
         if (cart == null || !cart.IsActive)
             throw new KeyNotFoundException("سبد خرید فعال یافت نشد.");
 
-        // پیدا کردن آیتم بر اساس شناسه محصول
+        // پیدا کردن محصول داخل سبد
         var cartItem = cart.Items
             .FirstOrDefault(item => item.ProductId == productId);
 
-        // اگر محصول داخل سبد نباشد
         if (cartItem == null)
             throw new KeyNotFoundException("محصول در سبد خرید یافت نشد.");
 
-        // علامت‌گذاری آیتم برای حذف از دیتابیس
+        // علامت‌گذاری محصول برای حذف
         await _cartRepository.RemoveItemAsync(cartItem);
+
+        // ثبت زمان آخرین تغییر سبد
+        cart.UpdatedAt = DateTime.UtcNow;
+
+        // ذخیره واقعی تغییرات در دیتابیس
+        await _cartRepository.SaveChangesAsync();
     }
 
     // تغییر تعداد یک محصول موجود در سبد خرید
@@ -203,6 +208,33 @@ public class CartService : ICartService
         cart.UpdatedAt = DateTime.UtcNow;
 
         // ذخیره تغییرات در دیتابیس
+        await _cartRepository.SaveChangesAsync();
+    }
+    // خالی کردن تمام محصولات سبد خرید یک کاربر
+    public async Task ClearCartAsync(string userId)
+    {
+        // بررسی معتبر بودن شناسه کاربر
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("شناسه کاربر معتبر نیست.");
+
+        // دریافت سبد خرید کاربر از Repository
+        var cart = await _cartRepository.GetByUserIdAsync(userId);
+
+        // بررسی وجود سبد خرید فعال
+        if (cart == null || !cart.IsActive)
+            throw new KeyNotFoundException("سبد خرید فعال یافت نشد.");
+
+        // اگر سبد از قبل خالی باشد، کاری انجام نمی‌دهیم
+        if (!cart.Items.Any())
+            return;
+
+        // حذف تمام آیتم‌های متعلق به همین سبد
+        _cartRepository.RemoveItems(cart.Items.ToList());
+
+        // ثبت آخرین زمان تغییر محتویات سبد
+        cart.UpdatedAt = DateTime.UtcNow;
+
+        // ذخیره نهایی تغییرات در دیتابیس
         await _cartRepository.SaveChangesAsync();
     }
 }

@@ -17,11 +17,23 @@ public class CartRepository : ICartRepository
 
     public async Task<Cart?> GetByUserIdAsync(string userId)
     {
+        // فقط سبد فعال متعلق به کاربر را جست‌وجو می‌کنیم
         return await _context.Carts
-            // بارگذاری آیتم‌ها و محصول هر آیتم
+            .Where(cart =>
+                cart.UserId == userId &&
+                cart.IsActive)
+
+            // دریافت آیتم‌های داخل سبد
             .Include(cart => cart.Items)
+
+            // دریافت اطلاعات محصول هر آیتم
             .ThenInclude(item => item.Product)
-            .FirstOrDefaultAsync(cart => cart.UserId == userId);
+
+            // انتخاب سبد فعال؛ در صورت وجود داده تکراری،
+            // فعلاً جدیدترین شناسه را انتخاب می‌کنیم
+            .OrderByDescending(cart => cart.Id)
+
+            .FirstOrDefaultAsync();
     }
 
     public async Task AddAsync(Cart cart)
@@ -48,5 +60,11 @@ public class CartRepository : ICartRepository
     public async Task SaveChangesAsync()
     {
         await _context.SaveChangesAsync();
+    }
+    // حذف چند آیتم از سبد خرید در یک عملیات
+    public void RemoveItems(IEnumerable<CartItem> cartItems)
+    {
+        // علامت‌گذاری تمام آیتم‌های ورودی برای حذف
+        _context.CartItems.RemoveRange(cartItems);
     }
 }
