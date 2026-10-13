@@ -42,116 +42,77 @@ public class CartController : ControllerBase
     {
         // این مسیر فقط در محیط توسعه قابل استفاده است
         if (!environment.IsDevelopment())
+        {
             return NotFound();
+        }
 
-        try
-        {
-            await _cartService.AddToCartAsync("test-user", dto);
+        // اجرای عملیات افزودن محصول به سبد خرید
+        // اگر سرویس خطا بدهد، مدیریت آن به GlobalExceptionHandler می‌رسد
+        await _cartService.AddToCartAsync("test-user", dto);
 
-            // عملیات موفق بوده و پاسخ بدنه ندارد
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            // محصول پیدا نشده است
-            return NotFound(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            // ورودی یا شرایط خرید معتبر نیست
-            return BadRequest(new { message = ex.Message });
-        }
+        // اگر عملیات موفق باشد، پاسخ 204 بدون بدنه برمی‌گردانیم
+        return NoContent();
     }
     // PUT: api/cart/test/items/4
-    // تغییر تعداد محصول مشخص در سبد کاربر آزمایشی
+    // تغییر تعداد یک محصول موجود در سبد کاربر آزمایشی
     [HttpPut("test/items/{productId:int}")]
     public async Task<IActionResult> UpdateTestItemQuantity(
         int productId,
         [FromBody] UpdateCartItemQuantityDto dto,
         [FromServices] IWebHostEnvironment environment)
     {
-        // این مسیر فقط مخصوص محیط توسعه است
+        // این مسیر فقط در محیط توسعه قابل استفاده است
         if (!environment.IsDevelopment())
+        {
             return NotFound();
+        }
 
-        try
-        {
-            // اجرای منطق تغییر تعداد در لایه Application
-            await _cartService.UpdateItemQuantityAsync(
-                "test-user",
-                productId,
-                dto);
+        // سرویس، وجود محصول و معتبر بودن تعداد جدید را بررسی می‌کند
+        await _cartService.UpdateItemQuantityAsync(
+            "test-user",
+            productId,
+            dto);
 
-            // عملیات موفق؛ پاسخی در بدنه برنمی‌گردانیم
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            // سبد یا محصول موردنظر وجود ندارد
-            return NotFound(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            // تعداد یا شرایط خرید نامعتبر است
-            return BadRequest(new { message = ex.Message });
-        }
+        // عملیات موفق بوده و پاسخ بدنه ندارد
+        return NoContent();
     }
     // DELETE: api/cart/test/items/4
-    // حذف محصول از سبد خرید کاربر آزمایشی
+    // حذف کامل یک محصول از سبد کاربر آزمایشی
     [HttpDelete("test/items/{productId:int}")]
     public async Task<IActionResult> RemoveTestItem(
         int productId,
         [FromServices] IWebHostEnvironment environment)
     {
-        // این Endpoint فقط در محیط Development فعال است
+        // این مسیر فقط در محیط توسعه قابل استفاده است
         if (!environment.IsDevelopment())
+        {
             return NotFound();
+        }
 
-        try
-        {
-            // حذف محصول از سبد خرید
-            await _cartService.RemoveFromCartAsync(
-                "test-user",
-                productId);
+        // حذف ردیف محصول از سبد خرید
+        await _cartService.RemoveFromCartAsync(
+            "test-user",
+            productId);
 
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        // حذف موفق بوده و پاسخ بدنه ندارد
+        return NoContent();
     }
     // DELETE: api/cart/test/items
-    // حذف تمام محصولات سبد خرید کاربر آزمایشی
+    // حذف تمام محصولات از سبد کاربر آزمایشی
     [HttpDelete("test/items")]
     public async Task<IActionResult> ClearTestCart(
         [FromServices] IWebHostEnvironment environment)
     {
-        // این Endpoint فقط در محیط توسعه فعال است
+        // این مسیر فقط در محیط توسعه قابل استفاده است
         if (!environment.IsDevelopment())
+        {
             return NotFound();
+        }
 
-        try
-        {
-            // درخواست خالی کردن سبد کاربر آزمایشی
-            await _cartService.ClearCartAsync("test-user");
+        // اجرای عملیات خالی‌کردن سبد خرید
+        await _cartService.ClearCartAsync("test-user");
 
-            // عملیات با موفقیت انجام شد
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            // سبد فعال وجود ندارد
-            return NotFound(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            // شناسه کاربر نامعتبر است
-            return BadRequest(new { message = ex.Message });
-        }
+        // عملیات موفق بوده و پاسخ بدنه ندارد
+        return NoContent();
     }
 }
