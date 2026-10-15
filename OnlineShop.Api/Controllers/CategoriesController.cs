@@ -33,7 +33,7 @@ public class CategoriesController : ControllerBase
     {
         var category = await _service.GetCategoryByIdAsync(id, ct);
         return category is null
-            ? NotFound($"دسته‌بندی با شناسه {id} یافت نشد.")
+            ? NotFound($"دسته‌بندی با شناسه {id} یافت نشد")
             : Ok(category);
     }
 

@@ -50,41 +50,50 @@ public class CartService : ICartService
     // افزودن کالا به سبد خرید
     public async Task AddToCartAsync(string userId, AddToCartDto dto)
     {
-        // بررسی ورودی در سرویس، حتی اگر از خارج API فراخوانی شود
+        // بررسی ورودی‌ها
         if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("شناسه کاربر الزامی است.");
+            throw new ArgumentException("شناسه کاربر الزامی است");
 
         if (dto.ProductId <= 0)
-            throw new ArgumentException("شناسه محصول معتبر نیست.");
+            throw new ArgumentException("شناسه محصول معتبر نیست");
 
         if (dto.Quantity < 1 || dto.Quantity > 100)
-            throw new ArgumentException("تعداد باید بین ۱ تا ۱۰۰ باشد.");
+            throw new ArgumentException("تعداد باید بین ۱ تا ۱۰۰ باشد");
 
-        // ابتدا محصول را بررسی می‌کنیم تا سبد بی‌دلیل ساخته نشود
-        var product = await _cartRepository.GetProductByIdAsync(dto.ProductId);
+        // بررسی محصول
+        var product = await _cartRepository
+            .GetProductByIdAsync(dto.ProductId);
 
         if (product == null)
-            throw new KeyNotFoundException("محصول مورد نظر یافت نشد.");
+            throw new KeyNotFoundException("محصول مورد نظر یافت نشد");
 
         if (!product.IsActive)
-            throw new ArgumentException("این محصول در حال حاضر قابل خرید نیست.");
+            throw new ArgumentException(
+                "این محصول در حال حاضر قابل خرید نیست");
 
+        // دریافت سبد و ردیف احتمالی محصول
         var cart = await _cartRepository.GetByUserIdAsync(userId);
 
-        // بررسی اینکه محصول از قبل در سبد وجود دارد یا نه
         var cartItem = cart?.Items
             .FirstOrDefault(item => item.ProductId == dto.ProductId);
 
-        // تعداد نهایی شامل تعداد قبلی و تعداد درخواست جدید است
-        long totalQuantity = (long)(cartItem?.Quantity ?? 0) + dto.Quantity;
+        // محاسبه تعداد نهایی
+        long totalQuantity =
+            (long)(cartItem?.Quantity ?? 0) + dto.Quantity;
 
+        // بررسی سقف تعداد هر محصول در سبد
+        if (totalQuantity > 100)
+            throw new ArgumentException(
+                "تعداد هر محصول در سبد نمی‌تواند بیشتر از ۱۰۰ باشد");
+
+        // بررسی موجودی برای تعداد نهایی
         if (totalQuantity > product.Stock)
             throw new ArgumentException(
-                $"موجودی کافی نیست. موجودی فعلی: {product.Stock} عدد.");
+                $"موجودی کافی نیست. موجودی فعلی: {product.Stock} عدد");
 
-        // در نبود سبد، آن را همراه آیتم جدید آماده می‌کنیم
         if (cart == null)
         {
+            // ساخت سبد همراه اولین محصول
             cart = new Cart { UserId = userId };
 
             cart.Items.Add(new CartItem
@@ -98,7 +107,7 @@ public class CartService : ICartService
         }
         else if (cartItem == null)
         {
-            // محصول جدید را به سبد موجود اضافه می‌کنیم
+            // افزودن محصول جدید به سبد موجود
             await _cartRepository.AddItemAsync(new CartItem
             {
                 CartId = cart.Id,
@@ -109,13 +118,12 @@ public class CartService : ICartService
         }
         else
         {
-            // برای محصول تکراری، تعداد همان ردیف را افزایش می‌دهیم
+            // افزایش تعداد ردیف موجود
             cartItem.Quantity = (int)totalQuantity;
         }
 
         cart.UpdatedAt = DateTime.UtcNow;
 
-        // تغییرات سبد و آیتم را با یک بار ذخیره ثبت می‌کنیم
         await _cartRepository.SaveChangesAsync();
     }
     // حذف کامل یک محصول از سبد خرید کاربر
@@ -123,25 +131,25 @@ public class CartService : ICartService
     {
         // بررسی شناسه کاربر
         if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("شناسه کاربر معتبر نیست.");
+            throw new ArgumentException("شناسه کاربر معتبر نیست");
 
         // بررسی شناسه محصول
         if (productId <= 0)
-            throw new ArgumentException("شناسه محصول معتبر نیست.");
+            throw new ArgumentException("شناسه محصول معتبر نیست");
 
         // دریافت سبد خرید کاربر
         var cart = await _cartRepository.GetByUserIdAsync(userId);
 
         // بررسی وجود سبد فعال
         if (cart == null || !cart.IsActive)
-            throw new KeyNotFoundException("سبد خرید فعال یافت نشد.");
+            throw new KeyNotFoundException("سبد خرید فعال یافت نشد");
 
         // پیدا کردن محصول داخل سبد
         var cartItem = cart.Items
             .FirstOrDefault(item => item.ProductId == productId);
 
         if (cartItem == null)
-            throw new KeyNotFoundException("محصول در سبد خرید یافت نشد.");
+            throw new KeyNotFoundException("محصول در سبد خرید یافت نشد");
 
         // علامت‌گذاری محصول برای حذف
         await _cartRepository.RemoveItemAsync(cartItem);
@@ -161,22 +169,22 @@ public class CartService : ICartService
     {
         // بررسی معتبر بودن شناسه کاربر
         if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("شناسه کاربر معتبر نیست.");
+            throw new ArgumentException("شناسه کاربر معتبر نیست");
 
         // بررسی معتبر بودن شناسه محصول
         if (productId <= 0)
-            throw new ArgumentException("شناسه محصول معتبر نیست.");
+            throw new ArgumentException("شناسه محصول معتبر نیست");
 
         // اعتبارسنجی تعداد در لایه Application
         if (dto.Quantity < 1 || dto.Quantity > 100)
-            throw new ArgumentException("تعداد باید بین ۱ تا ۱۰۰ باشد.");
+            throw new ArgumentException("تعداد باید بین ۱ تا ۱۰۰ باشد");
 
         // دریافت سبد خرید کاربر از دیتابیس
         var cart = await _cartRepository.GetByUserIdAsync(userId);
 
         // اگر کاربر سبد خرید نداشته باشد
         if (cart == null || !cart.IsActive)
-            throw new KeyNotFoundException("سبد خرید فعال یافت نشد.");
+            throw new KeyNotFoundException("سبد خرید فعال یافت نشد");
 
         // پیدا کردن محصول موردنظر در سبد خرید
         var cartItem = cart.Items
@@ -184,22 +192,22 @@ public class CartService : ICartService
 
         // محصول باید از قبل در سبد وجود داشته باشد
         if (cartItem == null)
-            throw new KeyNotFoundException("محصول در سبد خرید یافت نشد.");
+            throw new KeyNotFoundException("محصول در سبد خرید یافت نشد");
 
         // دریافت آخرین اطلاعات محصول از دیتابیس
         var product = await _cartRepository.GetProductByIdAsync(productId);
 
         if (product == null)
-            throw new KeyNotFoundException("محصول یافت نشد.");
+            throw new KeyNotFoundException("محصول یافت نشد");
 
         // بررسی فعال بودن محصول
         if (!product.IsActive)
-            throw new ArgumentException("محصول در حال حاضر قابل خرید نیست.");
+            throw new ArgumentException("محصول در حال حاضر قابل خرید نیست");
 
         // بررسی موجودی محصول
         if (dto.Quantity > product.Stock)
             throw new ArgumentException(
-                $"موجودی کافی نیست. موجودی فعلی: {product.Stock} عدد.");
+                $"موجودی کافی نیست. موجودی فعلی: {product.Stock} عدد");
 
         // تعیین تعداد جدید (نه اضافه کردن به تعداد قبلی)
         cartItem.Quantity = dto.Quantity;
@@ -215,14 +223,14 @@ public class CartService : ICartService
     {
         // بررسی معتبر بودن شناسه کاربر
         if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("شناسه کاربر معتبر نیست.");
+            throw new ArgumentException("شناسه کاربر معتبر نیست");
 
         // دریافت سبد خرید کاربر از Repository
         var cart = await _cartRepository.GetByUserIdAsync(userId);
 
         // بررسی وجود سبد خرید فعال
         if (cart == null || !cart.IsActive)
-            throw new KeyNotFoundException("سبد خرید فعال یافت نشد.");
+            throw new KeyNotFoundException("سبد خرید فعال یافت نشد");
 
         // اگر سبد از قبل خالی باشد، کاری انجام نمی‌دهیم
         if (!cart.Items.Any())

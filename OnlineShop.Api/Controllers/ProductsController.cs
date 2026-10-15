@@ -31,59 +31,67 @@ public class ProductsController : ControllerBase
         var product = await _productService.GetProductByIdAsync(id);
 
         if (product == null)
-            return NotFound($"محصولی با شناسه {id} در سیستم یافت نشد.");
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: $"محصولی با شناسه {id} یافت نشد");
+        }
 
         return Ok(product);
     }
-
-    // ثبت یک دیسک بازی جدید
+    // ایجاد محصول جدید
     [HttpPost]
-    public async Task<ActionResult<ProductDto>> Create([FromBody] CreateProductDto dto)
+    public async Task<ActionResult<ProductDto>> Create(
+        [FromBody] CreateProductDto dto)
     {
-        try
-        {
-            var createdProduct = await _productService.CreateProductAsync(dto);
+        // اجرای منطق ایجاد محصول در سرویس
+        var createdProduct =
+            await _productService.CreateProductAsync(dto);
 
-            // کد 201 Created به همراه آدرس متد GetById برای خواندن همین آیتم
-            return CreatedAtAction(nameof(GetById), new { id = createdProduct.Id }, createdProduct);
-        }
-        catch (ArgumentException ex)
-        {
-            // اگر قوانین بیزنس (مثل قیمت منفی) نقض شده بود، خطای 400 Bad Request برمی‌گردانیم
-            return BadRequest(new { message = ex.Message });
-        }
+        // پاسخ 201 همراه اطلاعات محصول و آدرس دریافت آن
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = createdProduct.Id },
+            createdProduct);
     }
 
-    // حذف یک دیسک از انبار
+    // حذف محصول از فروشگاه
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
+        // تلاش برای حذف محصول
         var isDeleted = await _productService.DeleteProductAsync(id);
 
+        // محصولی با این شناسه وجود ندارد
         if (!isDeleted)
-            return NotFound($"محصولی با شناسه {id} جهت حذف یافت نشد.");
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: $"محصولی با شناسه {id} جهت حذف یافت نشد");
+        }
 
-        return NoContent(); // کد استاندارد 204
+        // حذف موفق؛ پاسخ بدنه ندارد
+        return NoContent();
     }
     // ویرایش اطلاعات یک دیسک بازی
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto dto)
+    public async Task<IActionResult> Update(
+        int id,
+        [FromBody] UpdateProductDto dto)
     {
-        try
-        {
-            var isUpdated = await _productService.UpdateProductAsync(id, dto);
+        var isUpdated = await _productService
+            .UpdateProductAsync(id, dto);
 
-            if (!isUpdated)
-                return NotFound($"محصولی با شناسه {id} جهت ویرایش یافت نشد.");
-
-            return NoContent(); // کد استاندارد 204: یعنی با موفقیت اعمال شد
-        }
-        catch (ArgumentException ex)
+        if (!isUpdated)
         {
-            // در صورت عدم رعایت قوانین بیزنس، بازگرداندن خطای 400
-            return BadRequest(new { message = ex.Message });
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: $"محصولی با شناسه {id} جهت ویرایش یافت نشد");
         }
+
+        return NoContent();
     }
+
     // GET: api/Products/by-category/2
     // دریافت محصولات یک دسته‌بندی مشخص بر اساس شناسه دسته‌بندی
     [HttpGet("by-category/{categoryId:int}")]

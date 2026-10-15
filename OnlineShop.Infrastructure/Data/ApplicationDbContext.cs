@@ -1,10 +1,11 @@
 ﻿// File: OnlineShop.Infrastructure/Data/ApplicationDbContext.cs
 using Microsoft.EntityFrameworkCore;
 using OnlineShop.Domain.Entities;
-
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using OnlineShop.Infrastructure.Identity;
 namespace OnlineShop.Infrastructure.Data;
 
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {

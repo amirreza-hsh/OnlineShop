@@ -8,11 +8,14 @@ namespace OnlineShop.Application.Services;
 public class ProductService : IProductService
 {
     private readonly IProductRepository _repository;
+    private readonly ICategoryRepository _categoryRepository;
 
-    // اصل Dependency Injection: سرویس به قرارداد تکیه می‌کند نه به پیاده‌سازی مستقیم
-    public ProductService(IProductRepository repository)
+    public ProductService(
+        IProductRepository repository,
+        ICategoryRepository categoryRepository)
     {
         _repository = repository;
+        _categoryRepository = categoryRepository;
     }
 
     public async Task<List<ProductDto>> GetAllProductsAsync()
@@ -27,17 +30,38 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> CreateProductAsync(CreateProductDto dto)
     {
-        // اعمال اعتبارسنجی منطق بیزنس (Business Validation)
+        // بررسی قیمت
         if (dto.Price < 0)
-            throw new ArgumentException("قیمت دیسک نمی‌تواند منفی باشد.");
+            throw new ArgumentException(
+                "قیمت دیسک نمی‌تواند منفی باشد.");
 
-        if (dto.DiscountPrice.HasValue && dto.DiscountPrice.Value >= dto.Price)
-            throw new ArgumentException("قیمت با تخفیف باید از قیمت اصلی کمتر باشد.");
+        // بررسی قیمت تخفیف‌خورده
+        if (dto.DiscountPrice.HasValue &&
+            dto.DiscountPrice.Value >= dto.Price)
+        {
+            throw new ArgumentException(
+                "قیمت با تخفیف باید از قیمت اصلی کمتر باشد.");
+        }
 
+        // بررسی موجودی
         if (dto.Stock < 0)
-            throw new ArgumentException("موجودی انبار نمی‌تواند منفی باشد.");
+            throw new ArgumentException(
+                "موجودی انبار نمی‌تواند منفی باشد.");
 
-        // تبدیل (Mapping) از DTO به Domain Entity
+        // بررسی معتبر بودن شناسه دسته‌بندی
+        if (dto.CategoryId <= 0)
+            throw new ArgumentException(
+                "شناسه دسته‌بندی معتبر نیست.");
+
+        // بررسی وجود دسته‌بندی در دیتابیس
+        var category = await _categoryRepository
+            .GetByIdAsync(dto.CategoryId);
+
+        if (category == null)
+            throw new ArgumentException(
+                "دسته‌بندی انتخاب‌شده وجود ندارد.");
+
+        // آماده‌سازی محصول برای ذخیره
         var product = new Product
         {
             Title = dto.Title,
@@ -47,12 +71,13 @@ public class ProductService : IProductService
             Platform = dto.Platform,
             Region = dto.Region,
             EditionType = dto.EditionType,
-            CategoryId = dto.CategoryId // حتماً آیدی دسته رو هم ست کن
+            CategoryId = dto.CategoryId
         };
 
+        // ذخیره محصول
         var createdProduct = await _repository.AddAsync(product);
 
-        // تبدیل نتیجه به DTO برای بازگرداندن به لایه بالاتر
+        // برگرداندن اطلاعات محصول ساخته‌شده
         return new ProductDto
         {
             Id = createdProduct.Id,
@@ -63,7 +88,7 @@ public class ProductService : IProductService
             Platform = createdProduct.Platform,
             Region = createdProduct.Region,
             EditionType = createdProduct.EditionType,
-            CategoryId = createdProduct.CategoryId // 👈 اضافه شد: تا شناسه دسته‌بندی در خروجی پاسخ صفر نباشد
+            CategoryId = createdProduct.CategoryId
         };
     }
 
@@ -80,24 +105,45 @@ public class ProductService : IProductService
         return true;
     }
 
-    public async Task<bool> UpdateProductAsync(int id, UpdateProductDto dto)
+    public async Task<bool> UpdateProductAsync(
+        int id,
+        UpdateProductDto dto)
     {
-        // ۱. اعتبارسنجی قوانین بیزنس
+        // بررسی قوانین قیمت و موجودی
         if (dto.Price < 0)
-            throw new ArgumentException("قیمت دیسک نمی‌تواند منفی باشد.");
+            throw new ArgumentException(
+                "قیمت دیسک نمی‌تواند منفی باشد.");
 
-        if (dto.DiscountPrice.HasValue && dto.DiscountPrice.Value >= dto.Price)
-            throw new ArgumentException("قیمت با تخفیف باید از قیمت اصلی کمتر باشد.");
+        if (dto.DiscountPrice.HasValue &&
+            dto.DiscountPrice.Value >= dto.Price)
+        {
+            throw new ArgumentException(
+                "قیمت با تخفیف باید از قیمت اصلی کمتر باشد.");
+        }
 
         if (dto.Stock < 0)
-            throw new ArgumentException("موجودی انبار نمی‌تواند منفی باشد.");
+            throw new ArgumentException(
+                "موجودی انبار نمی‌تواند منفی باشد.");
 
-        // ۲. گرفتن محصول موجود از دیتابیس
+        // دریافت محصولی که قرار است ویرایش شود
         var product = await _repository.GetEntityByIdAsync(id);
+
         if (product == null)
             return false;
 
-        // ۳. اعمال تغییرات روی همان entity (بدون ساخت آبجکت جدید)
+        // بررسی دسته‌بندی جدید قبل از تغییر اطلاعات محصول
+        if (dto.CategoryId <= 0)
+            throw new ArgumentException(
+                "شناسه دسته‌بندی معتبر نیست.");
+
+        var category = await _categoryRepository
+            .GetByIdAsync(dto.CategoryId);
+
+        if (category == null)
+            throw new ArgumentException(
+                "دسته‌بندی انتخاب‌شده وجود ندارد.");
+
+        // اعمال اطلاعات جدید روی محصول موجود
         product.Title = dto.Title;
         product.Price = dto.Price;
         product.DiscountPrice = dto.DiscountPrice;
@@ -107,7 +153,9 @@ public class ProductService : IProductService
         product.EditionType = dto.EditionType;
         product.CategoryId = dto.CategoryId;
 
+        // ذخیره تغییرات
         await _repository.UpdateAsync(product);
+
         return true;
     }
 

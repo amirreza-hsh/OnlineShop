@@ -4,6 +4,8 @@ using OnlineShop.Application.Services;
 using OnlineShop.Infrastructure.Data;
 using OnlineShop.Infrastructure.Repositories;
 using OnlineShop.Api.ExceptionHandling;
+using Microsoft.AspNetCore.Identity;
+using OnlineShop.Infrastructure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,21 @@ builder.Services.AddSwaggerGen();
 // ۳. اضافه کردن ارتباط دیتابیس به سیستم
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services
+    .AddIdentityCore<ApplicationUser>(options =>
+    {
+        // هر ایمیل فقط برای یک حساب استفاده شود
+        options.User.RequireUniqueEmail = true;
+
+        // قوانین رمز عبور
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+    })
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>();
 // ثبت کلاس ارتباط سبد خرید با دیتابیس
 builder.Services.AddScoped<ICartRepository, CartRepository>();
 
@@ -56,3 +73,8 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+// قابل دسترسی کردن نقطه شروع برنامه برای پروژه تست
+public partial class Program
+{
+
+}
