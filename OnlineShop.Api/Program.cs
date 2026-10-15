@@ -55,6 +55,8 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 // فعال‌سازی پشتیبانی از پاسخ‌های استاندارد ProblemDetails
 builder.Services.AddProblemDetails();
+
+builder.Services.AddScoped<IAuthService, AuthService>();
 var app = builder.Build();
 // فعال‌سازی Middleware مدیریت خطاها
 app.UseExceptionHandler();
