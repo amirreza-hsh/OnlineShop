@@ -1,67 +1,94 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using OnlineShop.Api.ExceptionHandling;
 using OnlineShop.Application.Interfaces;
 using OnlineShop.Application.Services;
 using OnlineShop.Infrastructure.Data;
-using OnlineShop.Infrastructure.Repositories;
-using OnlineShop.Api.ExceptionHandling;
-using Microsoft.AspNetCore.Identity;
 using OnlineShop.Infrastructure.Identity;
+using OnlineShop.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ۱. اضافه کردن کنترلرها
+// کنترلرها
 builder.Services.AddControllers();
-// ثبت ریپازیتوری و سرویس در کانتینر DI
-builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddScoped<IProductService, ProductService>();
-// برای هر درخواست HTTP، یک نمونه از Repository دسته‌بندی می‌سازد.
-// این کلاس کارهای مربوط به خواندن و نوشتن در دیتابیس را انجام می‌دهد.
-builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 
-// برای هر درخواست HTTP، یک نمونه از سرویس دسته‌بندی می‌سازد.
-// این سرویس منطق برنامه را اجرا می‌کند و از Repository کمک می‌گیرد.
-builder.Services.AddScoped<ICategoryService, CategoryService>();
-
-
-// ۲. اضافه کردن سرویس‌های Swagger برای مستندسازی API
+// مستندسازی API
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ۳. اضافه کردن ارتباط دیتابیس به سیستم
+// اتصال دیتابیس
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// مدیریت کاربران و نقش‌ها
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
     {
-        // هر ایمیل فقط برای یک حساب استفاده شود
         options.User.RequireUniqueEmail = true;
 
-        // قوانین رمز عبور
+        // قوانین انتخاب رمز
         options.Password.RequiredLength = 8;
         options.Password.RequireDigit = true;
         options.Password.RequireLowercase = true;
         options.Password.RequireUppercase = true;
         options.Password.RequireNonAlphanumeric = true;
+
+        // تنظیمات قفل موقت حساب
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan =
+            TimeSpan.FromMinutes(5);
     })
     .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>();
-// ثبت کلاس ارتباط سبد خرید با دیتابیس
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddSignInManager();
+
+// احراز هویت با کوکی‌های Identity
+builder.Services
+    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddIdentityCookies();
+
+// تنظیمات کوکی ورود
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "OnlineShop.Auth";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+    options.SlidingExpiration = true;
+});
+
+// ابزار بررسی مجوز دسترسی
+builder.Services.AddAuthorization();
+
+// محصولات
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductService, ProductService>();
+
+// دسته‌بندی‌ها
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+
+// سبد خرید
 builder.Services.AddScoped<ICartRepository, CartRepository>();
-
-// ثبت کلاس اجرای عملیات سبد خرید
 builder.Services.AddScoped<ICartService, CartService>();
-// ثبت سیستم مدیریت متمرکز خطاها
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-// فعال‌سازی پشتیبانی از پاسخ‌های استاندارد ProblemDetails
+// حساب کاربری
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+// مدیریت متمرکز خطاها
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-builder.Services.AddScoped<IAuthService, AuthService>();
 var app = builder.Build();
-// فعال‌سازی Middleware مدیریت خطاها
+
+// رسیدگی به خطاهای درخواست
 app.UseExceptionHandler();
 
-// ۴. فعال‌سازی محیط Swagger در حالت توسعه (Development)
+// Swagger در محیط توسعه
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -69,14 +96,17 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// ابتدا شناسایی کاربر، سپس بررسی مجوز
+app.UseAuthentication();
 app.UseAuthorization();
 
-// ۵. وصل کردن مسیر کنترلرها
+// اتصال مسیرهای کنترلرها
 app.MapControllers();
 
 app.Run();
-// قابل دسترسی کردن نقطه شروع برنامه برای پروژه تست
+
+// دسترسی پروژه تست به نقطه شروع برنامه
 public partial class Program
 {
-
 }

@@ -1,17 +1,23 @@
-﻿using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.Identity.Client.NativeInterop;
 using OnlineShop.Application.DTOs.Auth;
 using OnlineShop.Application.Interfaces;
+using OnlineShop.Appp.Dto.Auth;
+using System.ComponentModel.DataAnnotations;
 
 namespace OnlineShop.Infrastructure.Identity;
 
 public class AuthService : IAuthService
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
 
-    public AuthService(UserManager<ApplicationUser> userManager)
+    public AuthService(
+        UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager)
     {
         _userManager = userManager;
+        _signInManager = signInManager;
     }
 
     public async Task<RegisterResultDto> RegisterAsync(RegisterDto dto)
@@ -67,5 +73,30 @@ public class AuthService : IAuthService
             FullName = user.FullName,
             Email = email
         };
+    }
+    public async Task<bool> LoginAsync(LoginDto dto)
+    {
+        // بررسی ورودی‌های خالی
+        if (string.IsNullOrWhiteSpace(dto.Email) ||
+            string.IsNullOrWhiteSpace(dto.Password))
+        {
+            return false;
+        }
+
+        // دریافت حساب با ایمیل
+        var user = await _userManager.FindByEmailAsync(
+            dto.Email.Trim());
+
+        if (user == null)
+            return false;
+
+        // بررسی رمز و انجام ورود در صورت موفقیت
+        var result = await _signInManager.PasswordSignInAsync(
+            user,
+            dto.Password,
+            isPersistent: false,
+            lockoutOnFailure: true);
+
+        return result.Succeeded;
     }
 }
