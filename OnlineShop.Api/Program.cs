@@ -9,9 +9,9 @@ using OnlineShop.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// کنترلرها
-builder.Services.AddControllers();
-
+// ثبت کنترلرها همراه سرویس‌های موردنیاز
+// برای فیلتر داخلی ValidateAntiForgeryToken
+builder.Services.AddControllersWithViews();
 // مستندسازی API
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -31,12 +31,12 @@ builder.Services
         options.Password.RequiredLength = 8;
         options.Password.RequireDigit = true;
         options.Password.RequireLowercase = true;
-        options.Password.RequireUppercase = true;
-        options.Password.RequireNonAlphanumeric = true;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireNonAlphanumeric = false;
 
         // تنظیمات قفل موقت حساب
         options.Lockout.AllowedForNewUsers = true;
-        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.MaxFailedAccessAttempts = 10;
         options.Lockout.DefaultLockoutTimeSpan =
             TimeSpan.FromMinutes(5);
     })
@@ -82,6 +82,17 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 // مدیریت متمرکز خطاها
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+// تنظیم توکن محافظت از درخواست
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+
+    options.Cookie.Name = "OnlineShop.Antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+});
+
 
 var app = builder.Build();
 
