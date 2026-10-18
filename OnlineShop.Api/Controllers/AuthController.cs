@@ -5,6 +5,7 @@ using OnlineShop.Application.Interfaces;
 using Microsoft.AspNetCore.Antiforgery;
 using OnlineShop.Appp.Dto.Auth;
 using System.Reflection;
+using System.Security.Claims;
 
 namespace OnlineShop.Api.Controllers;
 
@@ -66,5 +67,56 @@ public class AuthController : ControllerBase
         return StatusCode(
             StatusCodes.Status201Created,
             result);
+    }
+    // GET: /api/auth/me
+    // اطلاعات هویتی کاربری را برمی‌گرداند که اکنون وارد حساب است.
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult Me()
+    {
+        // Middleware احراز هویت، کوکی را بررسی کرده
+        // و هویت معتبر درخواست را در ویژگی User قرار داده است.
+        // شناسه را از این هویت می‌خوانیم، نه از ورودی مشتری.
+        string? userId = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        // این بررسی برای حالتی است که هویت، شناسه لازم را نداشته باشد.
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "هویت کاربر قابل تشخیص نیست.");
+        }
+
+        // ایمیل را از Claimهای هویت ورود می‌خوانیم.
+        // این متد برای دریافت ایمیل، مستقیماً دیتابیس را جست‌وجو نمی‌کند.
+        string? email = User.FindFirstValue(
+            ClaimTypes.Email);
+
+        // پاسخ 200 همراه اطلاعات محدود حساب.
+        // رمز، هش رمز و مقدار کوکی در پاسخ قرار نمی‌گیرند.
+        return Ok(new
+        {
+            userId,
+            email
+        });
+    }
+    // POST: /api/auth/logout
+    // خروج از حساب در مرورگری که درخواست را ارسال می‌کند.
+    [Authorize]
+    [HttpPost("logout")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Logout(
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken)
+    {
+        // ویژگی ValidateAntiForgeryToken قبل از اجرای متد،
+        // توکن هدر و کوکی همراه آن را اعتبارسنجی می‌کند.
+        // پارامتر بالا برای نمایش ورودی هدر در Swagger هم کاربرد دارد.
+
+        // سرویس، عملیات خروج را با ابزار Identity انجام می‌دهد.
+        await _authService.LogoutAsync();
+
+        // عملیات موفق است و نیازی به بدنه پاسخ نداریم.
+        return NoContent();
     }
 }

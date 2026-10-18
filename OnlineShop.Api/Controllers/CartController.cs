@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using OnlineShop.Application.DTOs.Cart;
 using OnlineShop.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace OnlineShop.Api.Controllers;
 
@@ -17,6 +19,33 @@ public class CartController : ControllerBase
     public CartController(ICartService cartService)
     {
         _cartService = cartService;
+    }
+    // GET: /api/cart
+    // دریافت سبد متعلق به حسابی که اکنون وارد شده است.
+    [Authorize]
+    [HttpGet]
+    public async Task<ActionResult<CartDto>> GetMyCart()
+    {
+        // شناسه را از هویت تأییدشده درخواست می‌گیریم.
+        // مشتری نمی‌تواند با ارسال شناسه دلخواه، سبد دیگری را انتخاب کند.
+        string? userId = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        // بررسی دفاعی: هویت باید شناسه کاربر داشته باشد.
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "هویت کاربر قابل تشخیص نیست.");
+        }
+
+        // همان سرویس قبلی را با شناسه واقعی حساب فراخوانی می‌کنیم.
+        // Repository فقط سبد فعال متعلق به این شناسه را جست‌وجو می‌کند.
+        var cart = await _cartService.GetCartByUserIdAsync(userId);
+
+        // اگر سبدی وجود نداشته باشد، سرویس فعلی یک DTO خالی برمی‌گرداند.
+        // این درخواست به‌تنهایی سبد جدیدی در دیتابیس ذخیره نمی‌کند.
+        return Ok(cart);
     }
 
     // این مسیر فعلاً فقط برای آزمایش در محیط توسعه است

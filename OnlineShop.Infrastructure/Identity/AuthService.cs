@@ -106,5 +106,12 @@ public class AuthService : IAuthService
 
         return result.Succeeded;
     }
+    public async Task LogoutAsync()
+    {
+        // ابزار Identity، کوکی‌های مربوط به ورود را پاک می‌کند.
+        // این عملیات حساب کاربری را از دیتابیس حذف نمی‌کند.
+        // پس از آن، مرورگر دیگر با کوکی فعلی واردشده محسوب نمی‌شود.
+        await _signInManager.SignOutAsync();
+    }
 
 }
