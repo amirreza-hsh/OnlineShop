@@ -1,57 +1,115 @@
-﻿// کتابخانه‌های لازم برای ساخت Controller و ویژگی‌های Routing
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-// DTO های دسته‌بندی (برای تبادل تمیز اطلاعات)
 using OnlineShop.Application.DTOs.Categories;
-// قرارداد ICategoryService (کنترلر به اینترفیس وصل می‌شود نه کلاس مستقیم)
 using OnlineShop.Application.Interfaces;
+using OnlineShop.Application.Security;
 
 namespace OnlineShop.Api.Controllers;
 
-// [ApiController]: ویژگی‌های هوشمند API مثل خطایابی خودکار مدل‌ها
-// [Route("api/[controller]")]: مسیر اندپوینت می‌شود: /api/categories
 [ApiController]
 [Route("api/[controller]")]
 public class CategoriesController : ControllerBase
 {
-    // فیلد سرویس
     private readonly ICategoryService _service;
 
-    // تزریق وابستگی (Dependency Injection) سرویس به کنترلر
     public CategoriesController(ICategoryService service)
     {
         _service = service;
     }
 
-    // GET /api/categories -> دریافت همه‌ی دسته‌ها (200 OK)
+    // مشاهده دسته‌بندی‌ها برای همه بازدیدکننده‌ها مجاز است
+    [AllowAnonymous]
     [HttpGet]
-    public async Task<ActionResult<List<CategoryDto>>> GetAll(CancellationToken ct)
-        => Ok(await _service.GetAllCategoriesAsync(ct));
+    public async Task<ActionResult<List<CategoryDto>>> GetAll(
+        CancellationToken ct)
+    {
+        var categories = await _service.GetAllCategoriesAsync(ct);
 
-    // GET /api/categories/5 -> دریافت یک دسته با شناسه عددی
+        return Ok(categories);
+    }
+
+    // مشاهده یک دسته‌بندی مشخص هم به ورود نیاز ندارد
+    [AllowAnonymous]
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<CategoryDto>> GetById(int id, CancellationToken ct)
+    public async Task<ActionResult<CategoryDto>> GetById(
+        int id,
+        CancellationToken ct)
     {
         var category = await _service.GetCategoryByIdAsync(id, ct);
-        return category is null
-            ? NotFound($"دسته‌بندی با شناسه {id} یافت نشد")
-            : Ok(category);
+
+        if (category == null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: $"دسته‌بندی با شناسه {id} یافت نشد");
+        }
+
+        return Ok(category);
     }
 
-    // POST /api/categories -> ایجاد دسته جدید (201 Created)
+    // ایجاد دسته‌بندی به نقش مدیر و توکن CSRF معتبر نیاز دارد
+    [Authorize(Roles = AppRoles.Admin)]
+    [ValidateAntiForgeryToken]
     [HttpPost]
-    public async Task<ActionResult<CategoryDto>> Create(CreateCategoryDto dto, CancellationToken ct)
+    public async Task<ActionResult<CategoryDto>> Create(
+        [FromBody] CreateCategoryDto dto,
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken,
+        CancellationToken ct)
     {
         var created = await _service.CreateCategoryAsync(dto, ct);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+
+        // آدرس دریافت دسته‌بندی ساخته‌شده در پاسخ قرار می‌گیرد
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = created.Id },
+            created);
     }
 
-    // PUT /api/categories/5 -> ویرایش دسته (204 No Content)
+    // مدیر اجازه تغییر دسته‌بندی را دارد
+    // منطق ویرایش همچنان داخل سرویس باقی مانده است
+    [Authorize(Roles = AppRoles.Admin)]
+    [ValidateAntiForgeryToken]
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, UpdateCategoryDto dto, CancellationToken ct)
-        => await _service.UpdateCategoryAsync(id, dto, ct) ? NoContent() : NotFound();
+    public async Task<IActionResult> Update(
+        int id,
+        [FromBody] UpdateCategoryDto dto,
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken,
+        CancellationToken ct)
+    {
+        bool updated = await _service.UpdateCategoryAsync(
+            id,
+            dto,
+            ct);
 
-    // DELETE /api/categories/5 -> حذف دسته (204 No Content)
+        if (!updated)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: $"دسته‌بندی با شناسه {id} یافت نشد");
+        }
+
+        return NoContent();
+    }
+
+    // محدودیت دسترسی باید در سرور اجرا شود
+    // پنهان‌کردن دکمه حذف در ظاهر سایت کافی نیست
+    [Authorize(Roles = AppRoles.Admin)]
+    [ValidateAntiForgeryToken]
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id, CancellationToken ct)
-        => await _service.DeleteCategoryAsync(id, ct) ? NoContent() : NotFound();
+    public async Task<IActionResult> Delete(
+        int id,
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken,
+        CancellationToken ct)
+    {
+        bool deleted = await _service.DeleteCategoryAsync(id, ct);
+
+        if (!deleted)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: $"دسته‌بندی با شناسه {id} یافت نشد");
+        }
+
+        return NoContent();
+    }
 }

@@ -6,6 +6,7 @@ using OnlineShop.Application.Services;
 using OnlineShop.Infrastructure.Data;
 using OnlineShop.Infrastructure.Identity;
 using OnlineShop.Infrastructure.Repositories;
+using OnlineShop.Application.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,6 +96,92 @@ builder.Services.AddAntiforgery(options =>
 
 
 var app = builder.Build();
+// این بخش فقط با فعال‌بودن گزینه SeedAdmin اجرا می‌شود
+// اجرای معمولی سایت و تست‌ها وارد این بخش نمی‌شود
+if (builder.Configuration.GetValue<bool>("SeedAdmin"))
+{
+    // این فرمان برای آماده‌سازی حساب مدیر در محیط توسعه است
+    if (!app.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException(
+            "فرمان تعیین مدیر فقط در محیط Development مجاز است");
+    }
+
+    // ایمیل حساب موردنظر از تنظیمات فرمان خوانده می‌شود
+    // این اطلاعات از درخواست ثبت‌نام مشتری دریافت نمی‌شود
+    string? adminEmail = builder.Configuration["AdminEmail"];
+
+    if (string.IsNullOrWhiteSpace(adminEmail))
+    {
+        throw new InvalidOperationException(
+            "ایمیل حساب مدیر را با AdminEmail مشخص کنید");
+    }
+
+    // ابزارهای مدیریت کاربران و نقش‌ها به Scope نیاز دارند
+    // چون اینجا درخواست HTTP نداریم، خودمان Scope می‌سازیم
+    using var scope = app.Services.CreateScope();
+
+    // ابزار پیدا کردن حساب و تغییر نقش کاربر
+    var userManager = scope.ServiceProvider
+        .GetRequiredService<UserManager<ApplicationUser>>();
+
+    // ابزار ساختن و بررسی نقش‌ها
+    var roleManager = scope.ServiceProvider
+        .GetRequiredService<RoleManager<IdentityRole>>();
+
+    // فقط حساب موجود را مدیر می‌کنیم
+    // این فرمان حساب یا رمز پیش‌فرض نمی‌سازد
+    var user = await userManager.FindByEmailAsync(
+        adminEmail.Trim());
+
+    if (user == null)
+    {
+        throw new InvalidOperationException(
+            "حسابی با این ایمیل پیدا نشد؛ ابتدا ثبت‌نام کنید");
+    }
+
+    // نقش Admin را فقط در صورت نبودن ایجاد می‌کنیم
+    if (!await roleManager.RoleExistsAsync(AppRoles.Admin))
+    {
+        var roleResult = await roleManager.CreateAsync(
+            new IdentityRole(AppRoles.Admin));
+
+        // ساخت نقش هم ممکن است ناموفق باشد
+        // بنابراین نتیجه را قبل از ادامه بررسی می‌کنیم
+        if (!roleResult.Succeeded)
+        {
+            string errors = string.Join(
+                " | ",
+                roleResult.Errors.Select(error => error.Description));
+
+            throw new InvalidOperationException(errors);
+        }
+    }
+
+    // قبل از افزودن نقش، عضویت فعلی را بررسی می‌کنیم
+    // اجرای دوباره فرمان نباید عضویت تکراری بسازد
+    if (!await userManager.IsInRoleAsync(user, AppRoles.Admin))
+    {
+        var assignmentResult = await userManager.AddToRoleAsync(
+            user,
+            AppRoles.Admin);
+
+        if (!assignmentResult.Succeeded)
+        {
+            string errors = string.Join(
+                " | ",
+                assignmentResult.Errors.Select(
+                    error => error.Description));
+
+            throw new InvalidOperationException(errors);
+        }
+    }
+
+    Console.WriteLine("نقش مدیر برای حساب مشخص‌شده ثبت شد");
+
+    // فرمان تمام شده و در این اجرا سرور را راه‌اندازی نمی‌کنیم
+    return;
+}
 
 // رسیدگی به خطاهای درخواست
 app.UseExceptionHandler();

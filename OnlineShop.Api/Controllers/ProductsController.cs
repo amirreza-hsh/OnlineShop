@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using OnlineShop.Application.DTOs.Products;
 using OnlineShop.Application.Interfaces;
+using OnlineShop.Application.Security;
 
 namespace OnlineShop.Api.Controllers;
 
@@ -8,23 +10,26 @@ namespace OnlineShop.Api.Controllers;
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
 {
-    // تزریق اینترفیس سرویس به جای دیتابیس (رعایت اصل وارونگی وابستگی DIP)
     private readonly IProductService _productService;
 
     public ProductsController(IProductService productService)
     {
+        // سرویس از طریق تزریق وابستگی دریافت می‌شود
         _productService = productService;
     }
 
-    // دریافت لیست تمام دیسک‌ها
+    // مشاهده فهرست محصولات برای مهمان هم مجاز است
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<List<ProductDto>>> GetAll()
     {
         var products = await _productService.GetAllProductsAsync();
-        return Ok(products); // برگرداندن کد 200 به همراه لیست DTOها
+
+        return Ok(products);
     }
 
-    // دریافت یک دیسک خاص بر اساس شناسه
+    // مشاهده جزئیات محصول به ورود نیاز ندارد
+    [AllowAnonymous]
     [HttpGet("{id}")]
     public async Task<ActionResult<ProductDto>> GetById(int id)
     {
@@ -39,30 +44,40 @@ public class ProductsController : ControllerBase
 
         return Ok(product);
     }
-    // ایجاد محصول جدید
+
+    // ساخت محصول فقط برای کاربر دارای نقش مدیر مجاز است
+    // توکن CSRF هم باید معتبر باشد چون اطلاعات فروشگاه تغییر می‌کند
+    [Authorize(Roles = AppRoles.Admin)]
+    [ValidateAntiForgeryToken]
     [HttpPost]
     public async Task<ActionResult<ProductDto>> Create(
-        [FromBody] CreateProductDto dto)
+        [FromBody] CreateProductDto dto,
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken)
     {
-        // اجرای منطق ایجاد محصول در سرویس
+        // پارامتر هدر برای نمایش ورودی آن در Swagger هم کاربرد دارد
+        // بررسی واقعی توکن توسط ویژگی بالای متد انجام می‌شود
         var createdProduct =
             await _productService.CreateProductAsync(dto);
 
-        // پاسخ 201 همراه اطلاعات محصول و آدرس دریافت آن
+        // پاسخ شامل محصول جدید و آدرس دریافت آن است
         return CreatedAtAction(
             nameof(GetById),
             new { id = createdProduct.Id },
             createdProduct);
     }
 
-    // حذف محصول از فروشگاه
+    // حذف خود محصول فروشگاه فقط برای مدیر مجاز است
+    // این عملیات با حذف یک ردیف از سبد مشتری متفاوت است
+    [Authorize(Roles = AppRoles.Admin)]
+    [ValidateAntiForgeryToken]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(
+        int id,
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken)
     {
-        // تلاش برای حذف محصول
         var isDeleted = await _productService.DeleteProductAsync(id);
 
-        // محصولی با این شناسه وجود ندارد
+        // مقدار false در سرویس فعلی یعنی محصول پیدا نشده است
         if (!isDeleted)
         {
             return Problem(
@@ -70,17 +85,21 @@ public class ProductsController : ControllerBase
                 title: $"محصولی با شناسه {id} جهت حذف یافت نشد");
         }
 
-        // حذف موفق؛ پاسخ بدنه ندارد
         return NoContent();
     }
-    // ویرایش اطلاعات یک دیسک بازی
+
+    // تغییر قیمت و موجودی و مشخصات محصول فقط برای مدیر است
+    [Authorize(Roles = AppRoles.Admin)]
+    [ValidateAntiForgeryToken]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(
         int id,
-        [FromBody] UpdateProductDto dto)
+        [FromBody] UpdateProductDto dto,
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken)
     {
-        var isUpdated = await _productService
-            .UpdateProductAsync(id, dto);
+        var isUpdated = await _productService.UpdateProductAsync(
+            id,
+            dto);
 
         if (!isUpdated)
         {
@@ -92,17 +111,17 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
-    // GET: api/Products/by-category/2
-    // دریافت محصولات یک دسته‌بندی مشخص بر اساس شناسه دسته‌بندی
+    // مشتری بدون ورود هم می‌تواند محصولات یک دسته را مشاهده کند
+    [AllowAnonymous]
     [HttpGet("by-category/{categoryId:int}")]
-    public async Task<ActionResult<IEnumerable<ProductDto>>> GetProductsByCategory(int categoryId, CancellationToken ct)
+    public async Task<ActionResult<IEnumerable<ProductDto>>>
+        GetProductsByCategory(
+            int categoryId,
+            CancellationToken ct)
     {
-        // صدا زدن سرویس با متدی که در اینترفیس تعریف کردیم
-        var products = await _productService.GetProductsByCategoryIdAsync(categoryId, ct);
+        var products = await _productService
+            .GetProductsByCategoryIdAsync(categoryId, ct);
 
-        // بازگرداندن وضعیت 200 OK به همراه داده‌ها
         return Ok(products);
     }
-
-
 }
