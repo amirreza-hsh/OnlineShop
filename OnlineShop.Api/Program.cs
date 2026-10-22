@@ -2,11 +2,12 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OnlineShop.Api.ExceptionHandling;
 using OnlineShop.Application.Interfaces;
+using OnlineShop.Application.Security;
 using OnlineShop.Application.Services;
 using OnlineShop.Infrastructure.Data;
 using OnlineShop.Infrastructure.Identity;
+using OnlineShop.Infrastructure.Orders;
 using OnlineShop.Infrastructure.Repositories;
-using OnlineShop.Application.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,7 +95,8 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Strict;
 });
 
-
+// سرویس سفارش در هر درخواست یک نمونه دریافت می‌کند
+builder.Services.AddScoped<IOrderService, OrderService>();
 var app = builder.Build();
 // این بخش فقط با فعال‌بودن گزینه SeedAdmin اجرا می‌شود
 // اجرای معمولی سایت و تست‌ها وارد این بخش نمی‌شود

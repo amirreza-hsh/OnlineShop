@@ -32,6 +32,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        // یک حساب نباید با یک شناسه درخواست، دو سفارش ذخیره کند
+        // این محدودیت در خود دیتابیس هم اجرا می‌شود
+        modelBuilder.Entity<Order>()
+            .HasIndex(order => new { order.UserId, order.RequestId })
+            .IsUnique()
+            .HasDatabaseName("IX_Orders_UserId_RequestId");
         // محدود کردن طول شناسه کاربر برای امکان ساخت Index
         // محدودکردن طول شناسه برای هماهنگی با شناسه کاربران Identity
         modelBuilder.Entity<Order>()

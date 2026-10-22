@@ -6,6 +6,9 @@ public class Order
 {
     public int Id { get; set; }
 
+    // شناسه درخواست ساخت این سفارش
+    // برای تشخیص تکرار درخواست نگهداری می‌شود
+    public Guid RequestId { get; set; }
     // شناسه حساب صاحب سفارش
     // مقدار آن باید از هویت کاربر واردشده گرفته شود
     public string UserId { get; set; } = string.Empty;

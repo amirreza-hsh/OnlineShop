@@ -7,11 +7,14 @@ namespace OnlineShop.Api.ExceptionHandling;
 
 public class GlobalExceptionHandler : IExceptionHandler
 {
+    // نمایش جزئیات خطا در خروجی سرور برای پیدا کردن علت
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
         CancellationToken cancellationToken)
     {
+        // نمایش جزئیات خطا در خروجی سرور برای پیدا کردن علت
+        System.Console.Error.WriteLine(exception.ToString());
         // تعیین کد HTTP براساس نوع خطا
         int statusCode = exception switch
         {
