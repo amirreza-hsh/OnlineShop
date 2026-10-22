@@ -300,6 +300,9 @@ namespace OnlineShop.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("Status")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -317,6 +320,10 @@ namespace OnlineShop.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Orders_UserId_RequestId");
 
                     b.ToTable("Orders");
                 });
