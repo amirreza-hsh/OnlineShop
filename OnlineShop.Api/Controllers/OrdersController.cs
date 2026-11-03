@@ -47,7 +47,41 @@ public class OrdersController : ControllerBase
         // نداشتن سفارش خطا نیست و با فهرست خالی پاسخ داده می‌شود
         return Ok(orders);
     }
+    // لغو سفارش متعلق به حساب واردشده
+    // این درخواست شماره سفارش را از آدرس می‌گیرد و بدنه ندارد
+    [HttpPost("{id:int}/cancel")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(
+        int id,
+        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken,
+        CancellationToken cancellationToken)
+    {
+        // صاحب سفارش را از اطلاعات ورود مشخص می‌کنیم
+        string? userId = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
 
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized();
+        }
+
+        // سرویس مالکیت و وضعیت فعلی سفارش را بررسی می‌کند
+        bool cancelled = await _orderService.CancelOrderAsync(
+            userId,
+            id,
+            cancellationToken);
+
+        // ۴۰۹ یعنی درخواست با وضعیت فعلی سفارش سازگار نیست
+        if (!cancelled)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "فقط سفارش پرداخت‌نشده قابل لغو است");
+        }
+
+        // عملیات موفق است و نیازی به بدنه پاسخ نداریم
+        return NoContent();
+    }
     // ساخت سفارش از سبد فعال حساب واردشده
     [HttpPost]
     [ValidateAntiForgeryToken]

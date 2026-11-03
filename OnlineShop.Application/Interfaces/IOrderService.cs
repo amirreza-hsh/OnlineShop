@@ -27,4 +27,28 @@ public interface IOrderService
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
+    // true یعنی سفارش لغو شده یا قبلاً لغو بوده است
+    // false یعنی وضعیت فعلی اجازه لغو نمی‌دهد
+    // سفارش ناموجود یا متعلق به دیگران با خطای یافت‌نشدن مشخص می‌شود
+
+    // دریافت فهرست سفارش‌ها برای بخش مدیریت
+    // این عملیات باید فقط از مسیر مخصوص مدیر فراخوانی شود
+    Task<List<OrderSummaryDto>> GetOrdersForAdminAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    // دریافت جزئیات یک سفارش برای مدیر
+    // کنترل مجوز مدیر در کنترلر انجام می‌شود
+    Task<OrderDto?> GetOrderForAdminAsync(
+        int orderId,
+        CancellationToken cancellationToken = default);
 }
+
+
+
+
+
+
+
+

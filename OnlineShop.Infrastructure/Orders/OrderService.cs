@@ -315,6 +315,218 @@ public class OrderService : IOrderService
         return order == null ? null : MapToDto(order);
     }
 
+    public async Task<bool> CancelOrderAsync(
+   string userId,
+   int orderId,
+   CancellationToken cancellationToken = default)
+    {
+        // شناسه کاربر باید از هویت معتبر درخواست دریافت شده باشد
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new ArgumentException("شناسه کاربر معتبر نیست");
+        }
+
+        // مالکیت و وضعیت را هم‌زمان در دستور تغییر بررسی می‌کنیم
+        // تنها سفارش پرداخت‌نشده متعلق به همین کاربر تغییر می‌کند
+        int affectedRows = await _context.Orders
+            .Where(order =>
+                order.Id == orderId &&
+                order.UserId == userId &&
+                order.Status == OrderStatus.PendingPayment)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    order => order.Status,
+                    OrderStatus.Cancelled),
+                cancellationToken);
+
+        // تغییر یک ردیف یعنی لغو سفارش موفق بوده است
+        if (affectedRows == 1)
+        {
+            return true;
+        }
+
+        // اگر ردیفی تغییر نکرد دلیل را بررسی می‌کنیم
+        // فقط وضعیت سفارش همین کاربر را می‌خوانیم
+        OrderStatus? currentStatus = await _context.Orders
+            .AsNoTracking()
+            .Where(order =>
+                order.Id == orderId &&
+                order.UserId == userId)
+            .Select(order => (OrderStatus?)order.Status)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        // nullable بودن کمک می‌کند نبودن سفارش را تشخیص بدهیم
+        // سفارش دیگران هم برای این کاربر یافت‌نشده محسوب می‌شود
+        if (currentStatus == null)
+        {
+            throw new KeyNotFoundException("سفارش یافت نشد");
+        }
+
+        // تکرار درخواست لغو برای سفارش لغوشده موفق محسوب می‌شود
+        if (currentStatus == OrderStatus.Cancelled)
+        {
+            return true;
+        }
+
+        // سفارش وجود دارد اما وضعیت آن اجازه لغو نمی‌دهد
+        return false;
+    }
+    public async Task<List<OrderSummaryDto>> GetOrdersForAdminAsync(
+    int page,
+    int pageSize,
+    CancellationToken cancellationToken = default)
+    {
+        // شماره صفحه از یک شروع می‌شود
+        if (page < 1)
+        {
+            throw new ArgumentException(
+                "شماره صفحه باید حداقل یک باشد");
+        }
+
+        // مدیر هم نباید همه سفارش‌ها را در یک درخواست دریافت کند
+        if (pageSize < 1 || pageSize > 50)
+        {
+            throw new ArgumentException(
+                "تعداد سفارش‌های هر صفحه باید بین ۱ و ۵۰ باشد");
+        }
+
+        // تعداد ردیف‌های صفحات قبلی را محاسبه می‌کنیم
+        // long از سرریز حاصل ضرب ورودی‌های بزرگ جلوگیری می‌کند
+        long skip = ((long)page - 1) * pageSize;
+
+        if (skip > int.MaxValue)
+        {
+            throw new ArgumentException(
+                "شماره صفحه بیش از حد بزرگ است");
+        }
+
+        return await _context.Orders
+            // فقط اطلاعات را می‌خوانیم و تغییری در سفارش‌ها نمی‌دهیم
+            .AsNoTracking()
+
+            // این متد مخصوص مدیریت است و سفارش‌های همه کاربران را می‌خواند
+            // مجوز دسترسی به آن در کنترلر بررسی می‌شود
+            .OrderByDescending(order => order.CreatedAt)
+
+            // برای زمان‌های برابر هم ترتیب مشخصی داریم
+            .ThenByDescending(order => order.Id)
+
+            // فقط سفارش‌های صفحه موردنظر را دریافت می‌کنیم
+            .Skip((int)skip)
+            .Take(pageSize)
+
+            // برای فهرست به خلاصه سفارش نیاز داریم
+            // اطلاعات گیرنده و محصولات از مسیر جزئیات خوانده می‌شوند
+            .Select(order => new OrderSummaryDto
+            {
+                Id = order.Id,
+                CreatedAt = order.CreatedAt,
+                Status = order.Status,
+                TotalAmount = order.TotalAmount
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<OrderDto?> GetOrderForAdminAsync(
+        int orderId,
+        CancellationToken cancellationToken = default)
+    {
+        // مدیر برای رسیدگی به سفارش باید اقلام آن را هم ببیند
+        var order = await _context.Orders
+            .AsNoTracking()
+            .Include(order => order.Items)
+            .SingleOrDefaultAsync(
+                order => order.Id == orderId,
+                cancellationToken);
+
+        // سفارش ناموجود با null مشخص می‌شود
+        // تبدیل به پاسخ ۴۰۴ بر عهده کنترلر است
+        if (order == null)
+        {
+            return null;
+        }
+
+        // از تبدیل‌کننده موجود پروژه دوباره استفاده می‌کنیم
+        return MapToDto(order);
+    }
+    public async Task<List<OrderSummaryDto>> GetOrdersForAdminAsync(
+    int page,
+    int pageSize,
+    CancellationToken cancellationToken = default)
+    {
+        // شماره صفحه از یک شروع می‌شود
+        if (page < 1)
+        {
+            throw new ArgumentException(
+                "شماره صفحه باید حداقل یک باشد");
+        }
+
+        // مدیر هم نباید همه سفارش‌ها را در یک درخواست دریافت کند
+        if (pageSize < 1 || pageSize > 50)
+        {
+            throw new ArgumentException(
+                "تعداد سفارش‌های هر صفحه باید بین ۱ و ۵۰ باشد");
+        }
+
+        // تعداد ردیف‌های صفحات قبلی را محاسبه می‌کنیم
+        // long از سرریز حاصل ضرب ورودی‌های بزرگ جلوگیری می‌کند
+        long skip = ((long)page - 1) * pageSize;
+
+        if (skip > int.MaxValue)
+        {
+            throw new ArgumentException(
+                "شماره صفحه بیش از حد بزرگ است");
+        }
+
+        return await _context.Orders
+            // فقط اطلاعات را می‌خوانیم و تغییری در سفارش‌ها نمی‌دهیم
+            .AsNoTracking()
+
+            // این متد مخصوص مدیریت است و سفارش‌های همه کاربران را می‌خواند
+            // مجوز دسترسی به آن در کنترلر بررسی می‌شود
+            .OrderByDescending(order => order.CreatedAt)
+
+            // برای زمان‌های برابر هم ترتیب مشخصی داریم
+            .ThenByDescending(order => order.Id)
+
+            // فقط سفارش‌های صفحه موردنظر را دریافت می‌کنیم
+            .Skip((int)skip)
+            .Take(pageSize)
+
+            // برای فهرست به خلاصه سفارش نیاز داریم
+            // اطلاعات گیرنده و محصولات از مسیر جزئیات خوانده می‌شوند
+            .Select(order => new OrderSummaryDto
+            {
+                Id = order.Id,
+                CreatedAt = order.CreatedAt,
+                Status = order.Status,
+                TotalAmount = order.TotalAmount
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<OrderDto?> GetOrderForAdminAsync(
+        int orderId,
+        CancellationToken cancellationToken = default)
+    {
+        // مدیر برای رسیدگی به سفارش باید اقلام آن را هم ببیند
+        var order = await _context.Orders
+            .AsNoTracking()
+            .Include(order => order.Items)
+            .SingleOrDefaultAsync(
+                order => order.Id == orderId,
+                cancellationToken);
+
+        // سفارش ناموجود با null مشخص می‌شود
+        // تبدیل به پاسخ ۴۰۴ بر عهده کنترلر است
+        if (order == null)
+        {
+            return null;
+        }
+
+        // از تبدیل‌کننده موجود پروژه دوباره استفاده می‌کنیم
+        return MapToDto(order);
+    }
     private Task<Order?> FindByRequestAsync(
         string userId,
         Guid requestId,
