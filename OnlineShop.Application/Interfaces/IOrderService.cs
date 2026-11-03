@@ -20,4 +20,11 @@ public interface IOrderService
         string userId,
         int orderId,
         CancellationToken cancellationToken = default);
+    // دریافت یک صفحه از سفارش‌های متعلق به کاربر
+    // شماره صفحه و تعداد سفارش‌های هر صفحه مشخص می‌شوند
+    Task<List<OrderSummaryDto>> GetMyOrdersAsync(
+        string userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }

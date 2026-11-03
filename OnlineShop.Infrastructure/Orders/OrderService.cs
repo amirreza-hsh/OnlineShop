@@ -229,6 +229,75 @@ public class OrderService : IOrderService
         }
     }
 
+    public async Task<List<OrderSummaryDto>> GetMyOrdersAsync(
+        string userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        // سرویس ممکن است مستقیماً از تست یا بخش دیگری فراخوانی شود
+        // بنابراین شناسه کاربر را همین‌جا هم بررسی می‌کنیم
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new ArgumentException("شناسه کاربر معتبر نیست");
+        }
+
+        // شماره صفحه از یک شروع می‌شود
+        if (page < 1)
+        {
+            throw new ArgumentException("شماره صفحه باید حداقل یک باشد");
+        }
+
+        // برای جلوگیری از دریافت حجم زیاد اطلاعات محدودیت می‌گذاریم
+        if (pageSize < 1 || pageSize > 50)
+        {
+            throw new ArgumentException(
+                "تعداد سفارش‌های هر صفحه باید بین ۱ و ۵۰ باشد");
+        }
+
+        // محاسبه تعداد سفارش‌هایی که باید از ابتدای فهرست رد کنیم
+        // استفاده از long مانع سرریز هنگام ضرب ورودی‌های بزرگ می‌شود
+        long skip = ((long)page - 1) * pageSize;
+
+        // متد Skip تعداد را به شکل int دریافت می‌کند
+        if (skip > int.MaxValue)
+        {
+            throw new ArgumentException("شماره صفحه بیش از حد بزرگ است");
+        }
+
+        return await _context.Orders
+            // این درخواست فقط اطلاعات را می‌خواند
+            .AsNoTracking()
+
+            // فقط سفارش‌های حساب واردشده وارد نتیجه می‌شوند
+            .Where(order => order.UserId == userId)
+
+            // سفارش‌های جدیدتر بالاتر نمایش داده می‌شوند
+            .OrderByDescending(order => order.CreatedAt)
+
+            // اگر زمان دو سفارش برابر بود ترتیب همچنان مشخص می‌ماند
+            .ThenByDescending(order => order.Id)
+
+            // سفارش‌های صفحات قبلی را رد می‌کنیم
+            .Skip((int)skip)
+
+            // فقط تعداد موردنیاز همین صفحه را دریافت می‌کنیم
+            .Take(pageSize)
+
+            // فقط ستون‌های موردنیاز فهرست از دیتابیس خوانده می‌شوند
+            // برای این صفحه نیازی به خواندن اقلام سفارش نداریم
+            .Select(order => new OrderSummaryDto
+            {
+                Id = order.Id,
+                CreatedAt = order.CreatedAt,
+                Status = order.Status,
+                TotalAmount = order.TotalAmount
+            })
+
+            // اجرای درخواست دیتابیس به شکل غیرهم‌زمان
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<OrderDto?> GetOrderByIdAsync(
         string userId,
         int orderId,

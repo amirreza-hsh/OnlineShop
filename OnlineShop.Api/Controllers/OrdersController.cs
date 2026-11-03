@@ -19,6 +19,35 @@ public class OrdersController : ControllerBase
         _orderService = orderService;
     }
 
+    // دریافت فهرست سفارش‌های حساب واردشده
+    // ویژگی Authorize روی کلاس، ورود را برای این مسیر هم الزامی می‌کند
+    [HttpGet]
+    public async Task<ActionResult<List<OrderSummaryDto>>> GetMyOrders(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        // شناسه صاحب سفارش‌ها را از هویت تأییدشده می‌گیریم
+        // مشتری نمی‌تواند شناسه کاربر دیگری را در ورودی انتخاب کند
+        string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        // اگر شناسه کاربر در هویت موجود نباشد درخواست پذیرفته نمی‌شود
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized();
+        }
+
+        // خواندن صفحه موردنظر از سفارش‌های همین کاربر
+        var orders = await _orderService.GetMyOrdersAsync(
+            userId,
+            page,
+            pageSize,
+            cancellationToken);
+
+        // نداشتن سفارش خطا نیست و با فهرست خالی پاسخ داده می‌شود
+        return Ok(orders);
+    }
+
     // ساخت سفارش از سبد فعال حساب واردشده
     [HttpPost]
     [ValidateAntiForgeryToken]
