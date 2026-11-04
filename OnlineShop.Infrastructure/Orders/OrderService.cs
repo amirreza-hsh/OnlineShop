@@ -1,11 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using OnlineShop.Application.DTOs.Orders;
 using OnlineShop.Application.Interfaces;
 using OnlineShop.Domain.Entities;
 using OnlineShop.Domain.Enums;
+using OnlineShop.Domain.Rules;
 using OnlineShop.Infrastructure.Data;
+using System.ComponentModel.DataAnnotations;
 
 namespace OnlineShop.Infrastructure.Orders;
 
@@ -443,6 +444,59 @@ public class OrderService : IOrderService
 
         // از تبدیل‌کننده موجود کلاس استفاده می‌کنیم
         return MapToDto(order);
+    }
+    public async Task<bool> ChangeStatusForAdminAsync(
+    int orderId,
+    OrderStatus nextStatus,
+    CancellationToken cancellationToken = default)
+    {
+        // سرویس ممکن است مستقیم و بدون کنترلر فراخوانی شود
+        // بنابراین معتبر بودن مقدار enum را اینجا هم بررسی می‌کنیم
+        if (!Enum.IsDefined(typeof(OrderStatus), nextStatus))
+        {
+            throw new ArgumentException(
+                "وضعیت ارسال‌شده معتبر نیست");
+        }
+
+        // فقط وضعیت فعلی را از دیتابیس می‌خوانیم
+        // برای تغییر وضعیت به محصولات و آدرس سفارش نیاز نداریم
+        OrderStatus? currentStatus = await _context.Orders
+            .AsNoTracking()
+            .Where(order => order.Id == orderId)
+            .Select(order => (OrderStatus?)order.Status)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        // نبودن سفارش با null مشخص می‌شود
+        if (currentStatus == null)
+        {
+            throw new KeyNotFoundException("سفارش یافت نشد");
+        }
+
+        // قانون مرحله قبل تعیین می‌کند این حرکت مجاز است یا نه
+        bool allowed = OrderStatusRules.CanAdminTransition(
+            currentStatus.Value,
+            nextStatus);
+
+        if (!allowed)
+        {
+            return false;
+        }
+
+        // وضعیت فقط وقتی تغییر می‌کند که هنوز همان مقدار خوانده‌شده باشد
+        // اگر درخواست دیگری زودتر آن را تغییر داده باشد ردیفی تغییر نمی‌کند
+        int affectedRows = await _context.Orders
+            .Where(order =>
+                order.Id == orderId &&
+                order.Status == currentStatus.Value)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    order => order.Status,
+                    nextStatus),
+                cancellationToken);
+
+        // این دستور تغییر را مستقیم در دیتابیس اجرا می‌کند
+        // نیازی به SaveChangesAsync نداریم
+        return affectedRows == 1;
     }
 
     private Task<Order?> FindByRequestAsync(

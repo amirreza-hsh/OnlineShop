@@ -1,6 +1,8 @@
 ﻿using OnlineShop.Application.DTOs.Orders;
+using OnlineShop.Domain.Enums;
 
 namespace OnlineShop.Application.Interfaces;
+
 
 // قرارداد عملیات سفارش
 public interface IOrderService
@@ -39,5 +41,11 @@ public interface IOrderService
     // دریافت جزئیات یک سفارش برای مدیر
     Task<OrderDto?> GetOrderForAdminAsync(
         int orderId,
+        CancellationToken cancellationToken = default);
+    // true یعنی وضعیت با موفقیت تغییر کرده است
+    // false یعنی تغییر مجاز نیست یا وضعیت هم‌زمان تغییر کرده است
+    Task<bool> ChangeStatusForAdminAsync(
+        int orderId,
+        OrderStatus nextStatus,
         CancellationToken cancellationToken = default);
 }
