@@ -96,41 +96,5 @@ public class AdminOrdersController : ControllerBase
         // عملیات موفق بوده و پاسخ بدنه ندارد
         return NoContent();
     }
-    // تغییر وضعیت سفارش توسط مدیر
-    // PATCH برای تغییر بخشی از اطلاعات سفارش استفاده می‌شود
-    [HttpPatch("{id:int}/status")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ChangeStatus(
-        int id,
-        [FromBody] ChangeOrderStatusDto dto,
-        [FromHeader(Name = "X-CSRF-TOKEN")] string? csrfToken,
-        CancellationToken cancellationToken)
-    {
-        // کنترلر ApiController ورودی نامعتبر را قبل از اجرای متد رد می‌کند
-        // این بررسی هم نبودن وضعیت را به‌صورت صریح پوشش می‌دهد
-        if (!dto.Status.HasValue)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "وضعیت جدید الزامی است");
-        }
-
-        // نقش مدیر از طریق Authorize روی کلاس بررسی می‌شود
-        bool changed = await _orderService.ChangeStatusForAdminAsync(
-            id,
-            dto.Status.Value,
-            cancellationToken);
-
-        // ممکن است تغییر درخواستی ممنوع باشد
-        // یا درخواست دیگری وضعیت سفارش را زودتر تغییر داده باشد
-        if (!changed)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "تغییر وضعیت مجاز نیست یا وضعیت سفارش تغییر کرده است");
-        }
-
-        // عملیات موفق بوده و پاسخ بدنه ندارد
-        return NoContent();
-    }
+    
 }

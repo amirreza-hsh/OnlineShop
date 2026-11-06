@@ -421,6 +421,26 @@ namespace OnlineShop.Infrastructure.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("OnlineShop.Domain.Entities.SimulatedPayment", b =>
+                {
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("ConfirmedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("Reference")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("OrderId");
+
+                    b.ToTable("SimulatedPayments");
+                });
+
             modelBuilder.Entity("OnlineShop.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
@@ -597,6 +617,15 @@ namespace OnlineShop.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("OnlineShop.Domain.Entities.SimulatedPayment", b =>
+                {
+                    b.HasOne("OnlineShop.Domain.Entities.Order", null)
+                        .WithOne()
+                        .HasForeignKey("OnlineShop.Domain.Entities.SimulatedPayment", "OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OnlineShop.Domain.Entities.Cart", b =>

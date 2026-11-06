@@ -28,10 +28,27 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     // جدول محصولات داخل سفارش‌ها
     public DbSet<OrderItem> OrderItems { get; set; }
+    // رکوردهای تأیید موفق پرداخت آزمایشی
+    public DbSet<SimulatedPayment> SimulatedPayments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<SimulatedPayment>(payment =>
+        {
+            // کلید اصلی جلوی ثبت پرداخت دوم برای همان سفارش را می‌گیرد
+            payment.HasKey(item => item.OrderId);
+
+            // دقت مبلغ با مبلغ ذخیره‌شده در سفارش یکسان است
+            payment.Property(item => item.Amount)
+                .HasPrecision(18, 2);
+
+            // هر رکورد پرداخت به یک سفارش موجود مربوط است
+            payment.HasOne<Order>()
+                .WithOne()
+                .HasForeignKey<SimulatedPayment>(item => item.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
         // یک حساب نباید با یک شناسه درخواست، دو سفارش ذخیره کند
         // این محدودیت در خود دیتابیس هم اجرا می‌شود
         modelBuilder.Entity<Order>()
